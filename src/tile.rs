@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use image::GenericImage;
 
 pub fn concat_jpeg_tile(
@@ -20,12 +19,7 @@ pub fn concat_jpeg_tile(
     for (i, decoded_image) in decoded_images.iter().enumerate() {
         let x = (i as u32 % horizontal_count) * tile_size;
         let y = (i as u32 / horizontal_count) * tile_size;
-        match decoded_image {
-            image::DynamicImage::ImageRgb8(image_buffer) => {
-                output_image.copy_from(image_buffer, x, y)?;
-            }
-            _ => return Err(anyhow!("Invalid JPEG data")),
-        }
+        output_image.copy_from(&decoded_image.to_rgb8(), x, y)?;
     }
 
     let mut output_bytes_vector: Vec<u8> = Vec::new();
