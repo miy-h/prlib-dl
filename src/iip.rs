@@ -75,3 +75,25 @@ pub async fn fetch_tile(
 
     Err(anyhow!("max retry"))
 }
+
+pub async fn fetch_page(
+    client: &reqwest::Client,
+    page: &Page,
+    settings: &Settings,
+) -> anyhow::Result<Vec<bytes::Bytes>> {
+    let tile_size: u64 = 256;
+    let horizontal_count = (page.width + tile_size - 1) / tile_size;
+    let vertical_count = (page.height + tile_size - 1) / tile_size;
+
+    let futures: Vec<_> = (0..(horizontal_count * vertical_count))
+        .collect::<Vec<u64>>()
+        .iter()
+        .map(|i| fetch_tile(&client, page, &settings, page.zoom, *i))
+        .collect();
+    let results = futures::future::join_all(futures)
+        .await
+        .into_iter()
+        .collect::<anyhow::Result<Vec<_>>>()?;
+
+    Ok(results)
+}

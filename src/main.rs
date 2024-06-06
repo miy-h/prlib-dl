@@ -50,28 +50,24 @@ async fn main() {
     let client = reqwest::Client::builder()
         .pool_max_idle_per_host(10)
         .build()
-        .expect("build");
+        .expect("Failed to build HTTP client");
     println!("Downloading manifest file...");
     let settings = extract_iip_settings_from_page(&client, target_url)
         .await
         .expect("Invalid settings");
     let manifest = iip::parse_manifest(&client, &settings.object_data)
         .await
-        .expect("hoge");
-    let page = manifest.first().expect("foo");
+        .expect("Invalid manifest file");
 
+    let page = manifest.first().expect("foo");
     println!("Downloading first page...");
-    let a: Vec<_> = (0..54)
-        .collect::<Vec<u64>>()
-        .iter()
-        .map(|i| iip::fetch_tile(&client, page, &settings, page.zoom, *i))
-        .collect();
-    let b: Vec<_> = futures::future::join_all(a).await;
-    for (i, img_result) in b.iter().enumerate() {
-        let img_bytes = img_result.as_ref().expect("download failed");
+    let images = iip::fetch_page(&client, page, &settings)
+        .await
+        .expect("Download failed");
+    for (i, image) in images.iter().enumerate() {
         let mut f =
             std::fs::File::create(format!("{}/{}.jpg", dist_dir, i)).expect("file open failed");
-        let b = img_bytes.slice(0..img_bytes.len());
+        let b = image.slice(0..image.len());
         f.write_all(&b).expect("file write failed");
         f.flush().expect("file write failed");
     }
