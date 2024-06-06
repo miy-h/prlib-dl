@@ -7,9 +7,9 @@ pub struct Settings {
 }
 
 pub struct Page {
-    pub zoom: u64,
-    pub width: u64,
-    pub height: u64,
+    pub zoom: u32,
+    pub width: u32,
+    pub height: u32,
     pub filename: String,
 }
 
@@ -23,7 +23,7 @@ pub async fn parse_manifest(client: &reqwest::Client, url: &str) -> anyhow::Resu
     for page in pages {
         let zoom = page["m"]
             .as_u64()
-            .ok_or(anyhow!("Invalid JSON structure"))?;
+            .ok_or(anyhow!("Invalid JSON structure"))? as u32;
         let filename = page["f"]
             .as_str()
             .ok_or(anyhow!("Invalid JSON structure"))?
@@ -35,11 +35,11 @@ pub async fn parse_manifest(client: &reqwest::Client, url: &str) -> anyhow::Resu
         let width = max_dimension["w"]
             .as_f64()
             .ok_or(anyhow!("Invalid JSON structure"))?
-            .floor() as u64;
+            .floor() as u32;
         let height = max_dimension["h"]
             .as_f64()
             .ok_or(anyhow!("Invalid JSON structure"))?
-            .floor() as u64;
+            .floor() as u32;
         result_pages.push(Page {
             zoom,
             width,
@@ -54,8 +54,8 @@ pub async fn fetch_tile(
     client: &reqwest::Client,
     page: &Page,
     settings: &Settings,
-    zoom: u64,
-    index: u64,
+    zoom: u32,
+    index: u32,
 ) -> anyhow::Result<bytes::Bytes> {
     let fif = format!("{}/{}", settings.image_dir, page.filename);
     let jtl = format!("{},{}", zoom, index);
@@ -81,12 +81,12 @@ pub async fn fetch_page(
     page: &Page,
     settings: &Settings,
 ) -> anyhow::Result<Vec<bytes::Bytes>> {
-    let tile_size: u64 = 256;
+    let tile_size: u32 = 256;
     let horizontal_count = (page.width + tile_size - 1) / tile_size;
     let vertical_count = (page.height + tile_size - 1) / tile_size;
 
     let futures: Vec<_> = (0..(horizontal_count * vertical_count))
-        .collect::<Vec<u64>>()
+        .collect::<Vec<_>>()
         .iter()
         .map(|i| fetch_tile(&client, page, &settings, page.zoom, *i))
         .collect();

@@ -1,8 +1,8 @@
 mod iip;
-
-use std::io::Write;
+mod tile;
 
 use anyhow::anyhow;
+use std::io::Write;
 
 fn extract_html_embeded_str(field: &str, text: &str) -> anyhow::Result<String> {
     let pattern = format!("\"{}\" *: *\"([^\"]+)\"", field);
@@ -59,16 +59,17 @@ async fn main() {
         .await
         .expect("Invalid manifest file");
 
-    let page = manifest.first().expect("foo");
-    println!("Downloading first page...");
-    let images = iip::fetch_page(&client, page, &settings)
-        .await
-        .expect("Download failed");
-    for (i, image) in images.iter().enumerate() {
-        let mut f =
-            std::fs::File::create(format!("{}/{}.jpg", dist_dir, i)).expect("file open failed");
-        let b = image.slice(0..image.len());
-        f.write_all(&b).expect("file write failed");
-        f.flush().expect("file write failed");
+    for (i, page) in manifest.iter().enumerate() {
+        let page_num = i + 1;
+        println!("Downloading page {}...", page_num);
+        let images = iip::fetch_page(&client, page, &settings)
+            .await
+            .expect(&format!("Download failed: page {}", page_num));
+        let image =
+            tile::concat_jpeg_tile(page.width, page.height, &images).expect("image concat failed");
+        let mut f = std::fs::File::create(format!("{}/{}.jpg", dist_dir, page_num))
+            .expect("file open failed");
+        f.write_all(&image).expect("file write failed");
+        f.flush().expect("flush failed");
     }
 }
