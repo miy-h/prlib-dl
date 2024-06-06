@@ -41,11 +41,37 @@ async fn extract_iip_settings_from_page(
     })
 }
 
+fn parse_page_specifier(spec: &str, page_count: u32) -> anyhow::Result<Vec<u32>> {
+    let mut result_pages: Vec<u32> = vec![];
+    for page_range in spec.split(",") {
+        if page_range.contains("-") {
+            let num_strings: Vec<_> = page_range.split("-").collect();
+            let start: u32 = num_strings
+                .get(0)
+                .ok_or(anyhow!("Invalid page specifier"))?
+                .parse()?;
+            let end_str = num_strings
+                .get(1)
+                .ok_or(anyhow!("Invalid page specifier"))?;
+            if *end_str == "" {
+                result_pages.extend(start..=page_count);
+            } else {
+                result_pages.extend(start..=end_str.parse::<u32>()?);
+            }
+        } else {
+            result_pages.push(page_range.parse::<u32>()?);
+        }
+    }
+    Ok(result_pages)
+}
+
 #[tokio::main]
 async fn main() {
     let args: Vec<_> = std::env::args().collect();
     let target_url = args.get(1).expect("Specify args");
     let dist_dir = args.get(2).expect("Specify args");
+    let default_page_spec = String::from("1-");
+    let page_spec = args.get(3).unwrap_or(&default_page_spec);
 
     let client = reqwest::Client::builder()
         .pool_max_idle_per_host(10)
@@ -59,9 +85,12 @@ async fn main() {
         .await
         .expect("Invalid manifest file");
 
-    for (i, page) in manifest.iter().enumerate() {
-        let page_num = i + 1;
+    let page_numbers =
+        parse_page_specifier(page_spec, manifest.len() as u32).expect("Invalid page specifier");
+    for page_num in page_numbers {
         println!("Downloading page {}...", page_num);
+        let page = manifest.get((page_num - 1) as usize).expect("msg");
+
         let images = iip::fetch_page(&client, page, &settings)
             .await
             .expect(&format!("Download failed: page {}", page_num));
