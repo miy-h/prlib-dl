@@ -75,6 +75,7 @@ async fn main() {
 
     let client = reqwest::Client::builder()
         .pool_max_idle_per_host(10)
+        .timeout(std::time::Duration::from_secs(10))
         .build()
         .expect("Failed to build HTTP client");
     println!("Downloading manifest file...");

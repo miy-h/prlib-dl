@@ -65,12 +65,19 @@ pub async fn fetch_tile(
         &settings.iip_server_url, fif, jtl
     );
 
-    for _ in 0..10 {
-        let response = client.get(&url_str).send().await?;
-        if response.status().is_success() {
-            let bytes = response.bytes().await?;
-            return Ok(bytes);
+    for i in 0..10 {
+        if let Ok(response) = client.get(&url_str).send().await {
+            if response.status().is_success() {
+                if let Ok(bytes) = response.bytes().await {
+                    return Ok(bytes);
+                }
+            }
         }
+        tokio::time::sleep(std::time::Duration::from_millis(std::cmp::min(
+            250 * 2u64.pow(i),
+            5000,
+        )))
+        .await;
     }
 
     Err(anyhow!("max retry"))
