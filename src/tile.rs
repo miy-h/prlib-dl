@@ -16,9 +16,9 @@ pub fn concat_jpeg_tile(
     let tile_size = 256;
     let horizontal_count = (width + tile_size - 1) / tile_size;
     let mut output_image = image::RgbImage::new(width, height);
-    for (i, decoded_image) in decoded_images.iter().enumerate() {
-        let x = (i as u32 % horizontal_count) * tile_size;
-        let y = (i as u32 / horizontal_count) * tile_size;
+    for (decoded_image, i) in decoded_images.iter().zip(0_u32..) {
+        let x = (i % horizontal_count) * tile_size;
+        let y = (i / horizontal_count) * tile_size;
         output_image.copy_from(&decoded_image.to_rgb8(), x, y)?;
     }
 
