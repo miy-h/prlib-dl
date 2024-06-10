@@ -5,7 +5,7 @@ use anyhow::anyhow;
 use std::io::Write;
 
 fn extract_html_embeded_str(field: &str, text: &str) -> anyhow::Result<String> {
-    let pattern = format!("\"{}\" *: *\"([^\"]+)\"", field);
+    let pattern = format!("\"{}\" *: *\"([^\"]+)\"", regex::escape(field));
     let re = regex::Regex::new(&pattern).expect("regex creation should succeed");
     let Some(cap) = re.captures(text) else {
         return Err(anyhow!("field not found: {field}"));
