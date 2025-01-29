@@ -8,7 +8,7 @@ pub fn concat_jpeg_tile(
     let decoded_images = images
         .iter()
         .map(|img| {
-            image::io::Reader::with_format(std::io::Cursor::new(img), image::ImageFormat::Jpeg)
+            image::ImageReader::with_format(std::io::Cursor::new(img), image::ImageFormat::Jpeg)
                 .decode()
         })
         .into_iter()
