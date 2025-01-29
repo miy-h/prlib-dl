@@ -4,6 +4,8 @@ mod tile;
 use anyhow::anyhow;
 use std::io::Write;
 
+const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), " v", env!("CARGO_PKG_VERSION"));
+
 fn extract_html_embeded_str(field: &str, text: &str) -> anyhow::Result<String> {
     let pattern = format!("\"{}\" *: *\"([^\"]+)\"", regex::escape(field));
     let re = regex::Regex::new(&pattern).expect("regex creation should succeed");
@@ -76,6 +78,7 @@ async fn main() {
     let client = reqwest::Client::builder()
         .pool_max_idle_per_host(10)
         .timeout(std::time::Duration::from_secs(10))
+        .user_agent(USER_AGENT)
         .build()
         .expect("Failed to build HTTP client");
     println!("Downloading manifest file...");
