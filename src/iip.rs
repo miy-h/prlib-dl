@@ -56,7 +56,9 @@ pub async fn fetch_tile(
     settings: &Settings,
     zoom: u32,
     index: u32,
+    semaphore: &tokio::sync::Semaphore,
 ) -> anyhow::Result<bytes::Bytes> {
+    let _permit = semaphore.acquire().await.unwrap();
     let fif = format!("{}/{}", settings.image_dir, page.filename);
     let jtl = format!("{},{}", zoom, index);
 
@@ -69,6 +71,7 @@ pub async fn fetch_tile(
         if let Ok(response) = client.get(&url_str).send().await {
             if response.status().is_success() {
                 if let Ok(bytes) = response.bytes().await {
+                    drop(_permit);
                     return Ok(bytes);
                 }
             }
@@ -80,6 +83,7 @@ pub async fn fetch_tile(
         .await;
     }
 
+    drop(_permit);
     Err(anyhow!("max retry"))
 }
 
@@ -87,6 +91,7 @@ pub async fn fetch_page(
     client: &reqwest::Client,
     page: &Page,
     settings: &Settings,
+    tile_fetcher_semaphore: &tokio::sync::Semaphore,
 ) -> anyhow::Result<Vec<bytes::Bytes>> {
     let tile_size: u32 = 256;
     let horizontal_count = (page.width + tile_size - 1) / tile_size;
@@ -95,7 +100,16 @@ pub async fn fetch_page(
     let futures: Vec<_> = (0..(horizontal_count * vertical_count))
         .collect::<Vec<_>>()
         .iter()
-        .map(|i| fetch_tile(&client, page, &settings, page.zoom, *i))
+        .map(|i| {
+            fetch_tile(
+                &client,
+                page,
+                &settings,
+                page.zoom,
+                *i,
+                &tile_fetcher_semaphore,
+            )
+        })
         .collect();
     let results = futures::future::join_all(futures)
         .await

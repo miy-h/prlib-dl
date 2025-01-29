@@ -86,13 +86,15 @@ async fn main() {
         .await
         .expect("Invalid manifest file");
 
+    let tile_fetcher_semaphore = tokio::sync::Semaphore::new(60);
+
     let page_numbers =
         parse_page_specifier(page_spec, manifest.len() as u32).expect("Invalid page specifier");
     for page_num in page_numbers {
         println!("Downloading page {}...", page_num);
         let page = manifest.get((page_num - 1) as usize).expect("msg");
 
-        let images = iip::fetch_page(&client, page, &settings)
+        let images = iip::fetch_page(&client, page, &settings, &tile_fetcher_semaphore)
             .await
             .expect(&format!("Download failed: page {}", page_num));
         let image =
