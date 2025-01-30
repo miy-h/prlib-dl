@@ -2,7 +2,7 @@ mod iip;
 mod tile;
 
 use anyhow::anyhow;
-use std::io::Write;
+use tokio::io::AsyncWriteExt;
 
 const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), " v", env!("CARGO_PKG_VERSION"));
 
@@ -102,9 +102,10 @@ async fn main() {
             .expect(&format!("Download failed: page {}", page_num));
         let image =
             tile::concat_jpeg_tile(page.width, page.height, &images).expect("image concat failed");
-        let mut f = std::fs::File::create(format!("{}/{}.jpg", dist_dir, page_num))
+        let mut f = tokio::fs::File::create(format!("{}/{}.jpg", dist_dir, page_num))
+            .await
             .expect("file open failed");
-        f.write_all(&image).expect("file write failed");
-        f.flush().expect("flush failed");
+        f.write_all(&image).await.expect("file write failed");
+        f.flush().await.expect("flush failed");
     }
 }
