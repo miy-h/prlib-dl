@@ -90,6 +90,7 @@ async fn main() {
         .expect("Invalid manifest file");
 
     let tile_fetcher_semaphore = tokio::sync::Semaphore::new(60);
+    let tile_concatenator_semaphore = std::sync::Arc::new(tokio::sync::Semaphore::const_new(1));
 
     let page_numbers =
         parse_page_specifier(page_spec, manifest.len() as u32).expect("Invalid page specifier");
@@ -97,11 +98,16 @@ async fn main() {
         println!("Downloading page {}...", page_num);
         let page = manifest.get((page_num - 1) as usize).expect("msg");
 
-        let images = iip::fetch_page(&client, page, &settings, &tile_fetcher_semaphore)
-            .await
-            .expect(&format!("Download failed: page {}", page_num));
-        let image =
-            tile::concat_jpeg_tile(page.width, page.height, &images).expect("image concat failed");
+        let image = iip::fetch_page(
+            &client,
+            page,
+            &settings,
+            &tile_fetcher_semaphore,
+            &tile_concatenator_semaphore,
+        )
+        .await
+        .expect(&format!("Download failed: page {}", page_num));
+
         let mut f = tokio::fs::File::create(format!("{}/{}.jpg", dist_dir, page_num))
             .await
             .expect("file open failed");

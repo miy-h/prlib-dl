@@ -1,3 +1,4 @@
+use crate::tile;
 use anyhow::anyhow;
 
 pub struct Settings {
@@ -87,7 +88,7 @@ pub async fn fetch_tile(
     Err(anyhow!("max retry"))
 }
 
-pub async fn fetch_page(
+pub async fn fetch_page_tiles(
     client: &reqwest::Client,
     page: &Page,
     settings: &Settings,
@@ -117,4 +118,27 @@ pub async fn fetch_page(
         .collect::<anyhow::Result<Vec<_>>>()?;
 
     Ok(results)
+}
+
+pub async fn fetch_page(
+    client: &reqwest::Client,
+    page: &Page,
+    settings: &Settings,
+    tile_fetcher_semaphore: &tokio::sync::Semaphore,
+    tile_concatenator_semaphore: &std::sync::Arc<tokio::sync::Semaphore>,
+) -> anyhow::Result<bytes::Bytes> {
+    let width = page.width;
+    let height = page.height;
+    let images = fetch_page_tiles(&client, page, &settings, &tile_fetcher_semaphore).await?;
+    let permit = tile_concatenator_semaphore
+        .clone()
+        .acquire_owned()
+        .await
+        .unwrap();
+    tokio::task::spawn_blocking(move || {
+        let image = tile::concat_jpeg_tile(width, height, &images);
+        drop(permit);
+        image
+    })
+    .await?
 }
