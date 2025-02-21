@@ -3,7 +3,7 @@ use image::GenericImage;
 pub fn concat_jpeg_tile(
     width: u32,
     height: u32,
-    images: &Vec<bytes::Bytes>,
+    images: &[bytes::Bytes],
 ) -> anyhow::Result<bytes::Bytes> {
     let decoded_images = images
         .iter()
@@ -11,10 +11,9 @@ pub fn concat_jpeg_tile(
             image::ImageReader::with_format(std::io::Cursor::new(img), image::ImageFormat::Jpeg)
                 .decode()
         })
-        .into_iter()
         .collect::<Result<Vec<_>, _>>()?;
     let tile_size = 256;
-    let horizontal_count = (width + tile_size - 1) / tile_size;
+    let horizontal_count = width.div_ceil(tile_size);
     let mut output_image = image::RgbImage::new(width, height);
     for (decoded_image, i) in decoded_images.iter().zip(0_u32..) {
         let x = (i % horizontal_count) * tile_size;

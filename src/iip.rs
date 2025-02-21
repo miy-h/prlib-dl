@@ -59,9 +59,9 @@ pub async fn fetch_tile(
     index: u32,
     semaphore: &tokio::sync::Semaphore,
 ) -> anyhow::Result<bytes::Bytes> {
-    let _permit = semaphore.acquire().await.unwrap();
+    let permit = semaphore.acquire().await.unwrap();
     let fif = format!("{}/{}", settings.image_dir, page.filename);
-    let jtl = format!("{},{}", zoom, index);
+    let jtl = format!("{zoom},{index}");
 
     let url_str = format!(
         "{}?FIF={}&JTL={}&CVT=JPEG",
@@ -72,7 +72,7 @@ pub async fn fetch_tile(
         if let Ok(response) = client.get(&url_str).send().await {
             if response.status().is_success() {
                 if let Ok(bytes) = response.bytes().await {
-                    drop(_permit);
+                    drop(permit);
                     return Ok(bytes);
                 }
             }
@@ -84,7 +84,7 @@ pub async fn fetch_tile(
         .await;
     }
 
-    drop(_permit);
+    drop(permit);
     Err(anyhow!("max retry"))
 }
 
@@ -95,20 +95,20 @@ pub async fn fetch_page_tiles(
     tile_fetcher_semaphore: &tokio::sync::Semaphore,
 ) -> anyhow::Result<Vec<bytes::Bytes>> {
     let tile_size: u32 = 256;
-    let horizontal_count = (page.width + tile_size - 1) / tile_size;
-    let vertical_count = (page.height + tile_size - 1) / tile_size;
+    let horizontal_count = page.width.div_ceil(tile_size);
+    let vertical_count = page.height.div_ceil(tile_size);
 
     let futures: Vec<_> = (0..(horizontal_count * vertical_count))
         .collect::<Vec<_>>()
         .iter()
         .map(|i| {
             fetch_tile(
-                &client,
+                client,
                 page,
-                &settings,
+                settings,
                 page.zoom,
                 *i,
-                &tile_fetcher_semaphore,
+                tile_fetcher_semaphore,
             )
         })
         .collect();
@@ -129,7 +129,7 @@ pub async fn fetch_page(
 ) -> anyhow::Result<bytes::Bytes> {
     let width = page.width;
     let height = page.height;
-    let images = fetch_page_tiles(&client, page, &settings, &tile_fetcher_semaphore).await?;
+    let images = fetch_page_tiles(client, page, settings, tile_fetcher_semaphore).await?;
     let permit = tile_concatenator_semaphore
         .clone()
         .acquire_owned()

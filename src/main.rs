@@ -45,17 +45,17 @@ async fn extract_iip_settings_from_page(
 
 fn parse_page_specifier(spec: &str, page_count: u32) -> anyhow::Result<Vec<u32>> {
     let mut result_pages: Vec<u32> = vec![];
-    for page_range in spec.split(",") {
-        if page_range.contains("-") {
-            let num_strings: Vec<_> = page_range.split("-").collect();
+    for page_range in spec.split(',') {
+        if page_range.contains('-') {
+            let num_strings: Vec<_> = page_range.split('-').collect();
             let start: u32 = num_strings
-                .get(0)
+                .first()
                 .ok_or(anyhow!("Invalid page specifier"))?
                 .parse()?;
             let end_str = num_strings
                 .get(1)
                 .ok_or(anyhow!("Invalid page specifier"))?;
-            if *end_str == "" {
+            if end_str.is_empty() {
                 result_pages.extend(start..=page_count);
             } else {
                 result_pages.extend(start..=end_str.parse::<u32>()?);
@@ -95,7 +95,7 @@ async fn main() {
     let page_numbers =
         parse_page_specifier(page_spec, manifest.len() as u32).expect("Invalid page specifier");
     for page_num in page_numbers {
-        println!("Downloading page {}...", page_num);
+        println!("Downloading page {page_num}...");
         let page = manifest.get((page_num - 1) as usize).expect("msg");
 
         let image = iip::fetch_page(
@@ -106,9 +106,9 @@ async fn main() {
             &tile_concatenator_semaphore,
         )
         .await
-        .expect(&format!("Download failed: page {}", page_num));
+        .unwrap_or_else(|_| panic!("Download failed: page {page_num}"));
 
-        let mut f = tokio::fs::File::create(format!("{}/{}.jpg", dist_dir, page_num))
+        let mut f = tokio::fs::File::create(format!("{dist_dir}/{page_num}.jpg"))
             .await
             .expect("file open failed");
         f.write_all(&image).await.expect("file write failed");
